@@ -1,0 +1,604 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>KubeWizard - Kubernetes 智能助手</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: #f8f9fa;
+            margin: 0;
+            padding: 0;
+            height: 100vh;
+            overflow: hidden;
+        }
+        .app-container {
+            display: flex;
+            height: 100vh;
+            background: white;
+        }
+        .sidebar {
+            width: 300px;
+            background: #f8f9fa;
+            border-right: 1px solid #e9ecef;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+        .sidebar-header {
+            padding: 20px;
+            border-bottom: 1px solid #e9ecef;
+            background: white;
+        }
+        .sidebar-header h2 {
+            margin: 0;
+            font-size: 18px;
+            color: #333;
+        }
+        .sessions-list {
+            flex: 1;
+            overflow-y: auto;
+            padding: 10px;
+        }
+        .session-item {
+            padding: 12px 16px;
+            margin-bottom: 8px;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: background 0.2s;
+            border: 1px solid transparent;
+        }
+        .session-item:hover {
+            background: #e9ecef;
+        }
+        .session-item.active {
+            background: #007bff;
+            color: white;
+        }
+        .session-title {
+            font-weight: 500;
+            margin-bottom: 4px;
+            font-size: 14px;
+        }
+        .session-preview {
+            font-size: 12px;
+            opacity: 0.7;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+        .main-content {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+        .chat-header {
+            padding: 20px;
+            border-bottom: 1px solid #e9ecef;
+            background: white;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+        .chat-title {
+            font-size: 20px;
+            font-weight: 600;
+            color: #333;
+        }
+        .status-badge {
+            padding: 4px 12px;
+            border-radius: 12px;
+            font-size: 12px;
+            font-weight: 500;
+        }
+        .status-connected {
+            background: #d4edda;
+            color: #155724;
+        }
+        .status-disconnected {
+            background: #f8d7da;
+            color: #721c24;
+        }
+        .chat-container {
+            flex: 1;
+            padding: 20px;
+            overflow-y: auto;
+            background: #fafafa;
+            display: flex;
+            flex-direction: column;
+        }
+        .message {
+            margin-bottom: 16px;
+            display: flex;
+            align-items: flex-start;
+            gap: 12px;
+        }
+        .message-avatar {
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 14px;
+            font-weight: 600;
+            flex-shrink: 0;
+        }
+        .user-avatar {
+            background: #007bff;
+            color: white;
+        }
+        .assistant-avatar {
+            background: #6c757d;
+            color: white;
+        }
+        .message-content {
+            flex: 1;
+            padding: 12px 16px;
+            border-radius: 18px;
+            max-width: 70%;
+            word-wrap: break-word;
+            line-height: 1.4;
+        }
+        .user-message .message-content {
+            background: #007bff;
+            color: white;
+            margin-left: auto;
+        }
+        .bot-message .message-content {
+            background: white;
+            color: #333;
+            border: 1px solid #e9ecef;
+        }
+        .user-message {
+            flex-direction: row-reverse;
+        }
+        .bottom-section {
+            background: white;
+            border-top: 1px solid #e9ecef;
+            padding: 20px;
+        }
+        .action-buttons {
+            display: flex;
+            gap: 12px;
+            margin-bottom: 16px;
+            justify-content: center;
+        }
+        .action-btn {
+            background: #f8f9fa;
+            color: #495057;
+            border: 1px solid #dee2e6;
+            padding: 8px 16px;
+            border-radius: 20px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .action-btn:hover {
+            background: #e9ecef;
+            border-color: #adb5bd;
+        }
+        .action-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+        .input-container {
+            display: flex;
+            gap: 12px;
+            align-items: flex-end;
+        }
+        .input-box, #userInput {
+            flex: 1;
+            padding: 12px 16px;
+            border: 1px solid #dee2e6;
+            border-radius: 24px;
+            font-size: 16px;
+            outline: none;
+            transition: border-color 0.2s;
+            resize: none;
+            min-height: 48px;
+            max-height: 120px;
+            font-family: inherit;
+        }
+        .input-box:focus, #userInput:focus {
+            border-color: #007bff;
+            box-shadow: 0 0 0 2px rgba(0, 123, 255, 0.25);
+        }
+        #sendBtn {
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 12px 20px;
+            border-radius: 24px;
+            cursor: pointer;
+            font-size: 16px;
+            transition: background 0.2s;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        #sendBtn:hover {
+            background: #0056b3;
+        }
+        #sendBtn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+        .loading {
+            display: none;
+            text-align: center;
+            padding: 20px;
+            color: #6c757d;
+        }
+        .typing-indicator {
+            display: inline-block;
+            animation: blink 1s infinite;
+        }
+        @keyframes blink {
+            0%, 50% { opacity: 1; }
+            51%, 100% { opacity: 0; }
+        }
+        .error-message {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        .status-indicator {
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    
+    <div class="app-container">
+        <!-- 左侧会话列表 -->
+        <div class="sidebar">
+            <div class="sidebar-header">
+                <h2>💬 会话列表</h2>
+            </div>
+            <div class="sessions-list" id="sessionsList">
+                <div class="session-item active" data-session-id="current">
+                    <div class="session-title">当前会话</div>
+                    <div class="session-preview">Kubernetes 助手对话...</div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- 右侧主要内容区域 -->
+        <div class="main-content">
+            <div class="chat-header">
+                <div class="chat-title">🚀 KubeWizard</div>
+                <div class="status-badge status-connected">已连接</div>
+            </div>
+            
+            <div class="chat-container" id="chatContainer">
+                <!-- Chat messages will appear here -->
+            </div>
+            
+            <div class="loading" id="loading">
+                <span class="typing-indicator">正在处理中...</span>
+            </div>
+            
+            <!-- 底部功能区域 -->
+            <div class="bottom-section">
+                <div class="action-buttons">
+                    <button class="action-btn" id="clearBtn">
+                        🗑️ 清除历史
+                    </button>
+                    <button class="action-btn" id="newSessionBtn">
+                        ➕ 新建会话
+                    </button>
+                    <button class="action-btn" onclick="exportChat()">
+                        📤 导出对话
+                    </button>
+                </div>
+                
+                <div class="input-container">
+                    <textarea id="userInput" placeholder="向 KubeWizard 提问关于 Kubernetes 的任何问题..." disabled rows="1"></textarea>
+                    <button id="sendBtn" disabled>
+                        ➤ 发送
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Configuration - 连接到 app.py 的 Flask 服务
+        const API_BASE_URL = 'http://14.103.178.77:5000';
+        
+        // Global variables
+        let currentBotMessageDiv = null;
+        let isConnected = false;
+        
+        // DOM elements
+        const chatContainer = document.getElementById('chatContainer');
+        const userInput = document.getElementById('userInput');
+        const sendBtn = document.getElementById('sendBtn');
+        const loading = document.getElementById('loading');
+        const statusIndicator = document.getElementById('statusIndicator');
+        const clearBtn = document.getElementById('clearBtn');
+        const newSessionBtn = document.getElementById('newSessionBtn');
+        
+        // Utility functions
+        function updateStatus(connected) {
+            isConnected = connected;
+            const statusBadge = document.querySelector('.status-badge');
+            statusBadge.textContent = connected ? '已连接' : '连接断开';
+            statusBadge.className = `status-badge ${connected ? 'status-connected' : 'status-disconnected'}`;
+            userInput.disabled = !connected;
+            sendBtn.disabled = !connected;
+            clearBtn.disabled = !connected;
+            newSessionBtn.disabled = !connected;
+            if (!connected) {
+                userInput.placeholder = '连接断开，请稍后重试...';
+            } else {
+                userInput.placeholder = '向 KubeWizard 提问关于 Kubernetes 的任何问题...';
+            }
+        }
+        
+        function addMessage(content, isUser, isError = false) {
+            const messageDiv = document.createElement('div');
+            let className = 'message ';
+            if (isUser) {
+                className += 'user-message';
+            } else if (isError) {
+                className += 'bot-message error-message';
+            } else {
+                className += 'bot-message';
+            }
+            messageDiv.className = className;
+            
+            // 创建头像
+            const avatar = document.createElement('div');
+            avatar.className = isUser ? 'message-avatar user-avatar' : 'message-avatar assistant-avatar';
+            avatar.textContent = isUser ? 'U' : 'AI';
+            
+            // 创建消息内容
+            const messageContent = document.createElement('div');
+            messageContent.className = 'message-content';
+            messageContent.textContent = content;
+            
+            messageDiv.appendChild(avatar);
+            messageDiv.appendChild(messageContent);
+            chatContainer.appendChild(messageDiv);
+            chatContainer.scrollTop = chatContainer.scrollHeight;
+        }
+        
+        function addStreamMessage(content, isUser, isComplete = false, isError = false) {
+            if (isUser) {
+                addMessage(content, true);
+                return;
+            }
+            
+            if (!currentBotMessageDiv) {
+                currentBotMessageDiv = document.createElement('div');
+                currentBotMessageDiv.className = `message bot-message ${isError ? 'error-message' : ''}`;
+                currentBotMessageDiv.innerHTML = '<strong>KubeWizard:</strong> <span class="content"></span>';
+                chatContainer.appendChild(currentBotMessageDiv);
+            }
+            
+            const contentSpan = currentBotMessageDiv.querySelector('.content');
+            contentSpan.textContent = content;
+            
+            if (isComplete) {
+                currentBotMessageDiv = null;
+            }
+            
+            chatContainer.scrollTop = chatContainer.scrollHeight;
+        }
+        
+        function showLoading(show) {
+            loading.style.display = show ? 'block' : 'none';
+            sendBtn.disabled = show || !isConnected;
+        }
+        
+        // API functions
+        async function checkConnection() {
+            try {
+                const response = await fetch(`${API_BASE_URL}/api/health`, {
+                    method: 'GET',
+                    timeout: 5000
+                });
+                updateStatus(response.ok);
+                return response.ok;
+            } catch (error) {
+                console.error('Connection check failed:', error);
+                updateStatus(false);
+                return false;
+            }
+        }
+        
+        async function loadChatHistory() {
+            try {
+                const response = await fetch(`${API_BASE_URL}/api/history`);
+                if (response.ok) {
+                    const data = await response.json();
+                    data.history.forEach(msg => {
+                        addStreamMessage(msg.content, msg.is_user, true);
+                    });
+                }
+            } catch (error) {
+                console.log('Failed to load chat history:', error);
+            }
+        }
+        
+        async function sendMessage() {
+            const message = userInput.value.trim();
+            if (!message || !isConnected) {
+                return;
+            }
+            
+            addStreamMessage(message, true);
+            userInput.value = '';
+            showLoading(true);
+            
+            try {
+                const response = await fetch(`${API_BASE_URL}/api/chat/stream`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ message: message })
+                });
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+                
+                const reader = response.body.getReader();
+                const decoder = new TextDecoder();
+                
+                showLoading(false);
+                
+                while (true) {
+                    const { done, value } = await reader.read();
+                    if (done) break;
+                    
+                    const chunk = decoder.decode(value);
+                    const lines = chunk.split('\n');
+                    
+                    for (const line of lines) {
+                        if (line.startsWith('data: ')) {
+                            try {
+                                const data = JSON.parse(line.slice(6));
+                                addStreamMessage(data.content, false, data.done, data.error);
+                                
+                                if (data.done) {
+                                    break;
+                                }
+                            } catch (e) {
+                                console.error('Error parsing SSE data:', e);
+                            }
+                        }
+                    }
+                }
+                
+            } catch (error) {
+                console.error('Error in sendMessage:', error);
+                addStreamMessage(`网络错误: ${error.message}`, false, true, true);
+                updateStatus(false);
+            } finally {
+                showLoading(false);
+            }
+        }
+        
+        // Clear chat history
+        async function clearChatHistory() {
+            if (!isConnected) return;
+            
+            try {
+                const response = await fetch(`${API_BASE_URL}/api/clear`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    }
+                });
+                
+                if (response.ok) {
+                    chatContainer.innerHTML = '';
+                    currentBotMessageDiv = null;
+                    addMessage('聊天历史已清除，您可以开始新的对话。', false);
+                } else {
+                    addMessage('清除历史失败，请稍后重试。', false, true);
+                }
+            } catch (error) {
+                console.error('Error clearing chat history:', error);
+                addMessage(`清除历史出错: ${error.message}`, false, true);
+            }
+        }
+        
+        // Start new session (same as clear for now)
+        async function startNewSession() {
+            if (!isConnected) return;
+            
+            await clearChatHistory();
+            addMessage('已开始新会话，欢迎使用 KubeWizard！', false);
+        }
+        
+        // Event listeners
+        sendBtn.addEventListener('click', sendMessage);
+        clearBtn.addEventListener('click', clearChatHistory);
+        newSessionBtn.addEventListener('click', startNewSession);
+        
+        function handleKeyPress(event) {
+            if (event.key === 'Enter' && !event.shiftKey) {
+                event.preventDefault();
+                sendMessage();
+            }
+        }
+        
+        userInput.addEventListener('keypress', handleKeyPress);
+        
+        // Initialize application
+        async function init() {
+            console.log('Initializing KubeWizard frontend...');
+            
+            // Check initial connection
+            const connected = await checkConnection();
+            
+            if (connected) {
+                await loadChatHistory();
+                addMessage('欢迎使用 KubeWizard！我是您的 Kubernetes 智能助手。', false);
+            } else {
+                addMessage('无法连接到后端服务，请检查服务器是否运行在 http://localhost:5000', false, true);
+            }
+            
+            // Set up periodic connection check
+            setInterval(checkConnection, 30000); // Check every 30 seconds
+            
+            // Auto-resize textarea
+            const userInput = document.getElementById('userInput');
+            userInput.addEventListener('input', function() {
+                this.style.height = 'auto';
+                this.style.height = Math.min(this.scrollHeight, 120) + 'px';
+            });
+        }
+        
+        // Export chat function
+        function exportChat() {
+            if (!isConnected) return;
+            
+            const messages = [];
+            const messageElements = chatContainer.querySelectorAll('.message');
+            
+            messageElements.forEach(msg => {
+                const isUser = msg.classList.contains('user-message');
+                const content = msg.querySelector('.message-content')?.textContent || msg.textContent;
+                messages.push({
+                    type: isUser ? '用户' : 'KubeWizard',
+                    content: content
+                });
+            });
+            
+            const exportData = {
+                timestamp: new Date().toISOString(),
+                messages: messages
+            };
+            
+            const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `kubewizard-chat-${new Date().toISOString().slice(0, 10)}.json`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        }
+        
+        // Start the application when DOM is loaded
+        document.addEventListener('DOMContentLoaded', init);
+    </script>
+</body>
+</html>

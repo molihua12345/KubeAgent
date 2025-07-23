@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>KubeWizard - Kubernetes 智能助手</title>
+    <title>KubeAgent - Kubernetes 智能助手</title>
     <style>
         * {
             margin: 0;
@@ -256,6 +256,58 @@
         .status-indicator {
             display: none;
         }
+        
+        /* 格式化内容样式 */
+        .message-content pre {
+            background: #f8f9fa;
+            border: 1px solid #e9ecef;
+            border-radius: 6px;
+            padding: 12px;
+            margin: 8px 0;
+            overflow-x: auto;
+            font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+            font-size: 14px;
+            line-height: 1.4;
+        }
+        
+        .message-content code {
+            background: #f8f9fa;
+            border: 1px solid #e9ecef;
+            border-radius: 3px;
+            padding: 2px 6px;
+            font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+            font-size: 14px;
+        }
+        
+        .message-content pre code {
+            background: none;
+            border: none;
+            padding: 0;
+        }
+        
+        .message-content ul {
+            margin: 8px 0;
+            padding-left: 20px;
+        }
+        
+        .message-content li {
+            margin: 4px 0;
+        }
+        
+        .message-content strong {
+            font-weight: 600;
+        }
+        
+        .message-content em {
+            font-style: italic;
+        }
+        
+        .user-message .message-content pre,
+        .user-message .message-content code {
+            background: rgba(255, 255, 255, 0.2);
+            border-color: rgba(255, 255, 255, 0.3);
+            color: white;
+        }
     </style>
 </head>
 <body>
@@ -277,7 +329,7 @@
         <!-- 右侧主要内容区域 -->
         <div class="main-content">
             <div class="chat-header">
-                <div class="chat-title">🚀 KubeWizard</div>
+                <div class="chat-title">🚀 KubeAgent</div>
                 <div class="status-badge status-connected">已连接</div>
             </div>
             
@@ -304,7 +356,7 @@
                 </div>
                 
                 <div class="input-container">
-                    <textarea id="userInput" placeholder="向 KubeWizard 提问关于 Kubernetes 的任何问题..." disabled rows="1"></textarea>
+                    <textarea id="userInput" placeholder="向 KubeAgent 提问关于 Kubernetes 的任何问题..." disabled rows="1"></textarea>
                     <button id="sendBtn" disabled>
                         ➤ 发送
                     </button>
@@ -343,7 +395,7 @@
             if (!connected) {
                 userInput.placeholder = '连接断开，请稍后重试...';
             } else {
-                userInput.placeholder = '向 KubeWizard 提问关于 Kubernetes 的任何问题...';
+                userInput.placeholder = '向 KubeAgent 提问关于 Kubernetes 的任何问题...';
             }
         }
         
@@ -367,12 +419,61 @@
             // 创建消息内容
             const messageContent = document.createElement('div');
             messageContent.className = 'message-content';
-            messageContent.textContent = content;
+            
+            // 格式化消息内容
+             if (isUser) {
+                 messageContent.textContent = content;
+             } else {
+                 // 对AI回复进行格式化处理
+                 messageContent.innerHTML = formatAIResponse(content);
+             }
             
             messageDiv.appendChild(avatar);
             messageDiv.appendChild(messageContent);
             chatContainer.appendChild(messageDiv);
             chatContainer.scrollTop = chatContainer.scrollHeight;
+            
+            // 保存到当前会话
+            if (!sessions[currentSessionId].messages) {
+                sessions[currentSessionId].messages = [];
+            }
+            sessions[currentSessionId].messages.push({
+                isUser: isUser,
+                content: content
+            });
+            
+            // 更新会话预览
+            if (sessions[currentSessionId].messages.length > 0) {
+                const lastMessage = sessions[currentSessionId].messages[sessions[currentSessionId].messages.length - 1];
+                sessions[currentSessionId].preview = lastMessage.content.substring(0, 30) + '...';
+                updateSessionsList();
+            }
+        }
+        
+        function formatAIResponse(content) {
+            // 处理代码块
+            content = content.replace(/```([\s\S]*?)```/g, '<pre><code>$1</code></pre>');
+            
+            // 处理行内代码
+            content = content.replace(/`([^`]+)`/g, '<code>$1</code>');
+            
+            // 处理换行
+            content = content.replace(/\n/g, '<br>');
+            
+            // 处理列表项
+            content = content.replace(/^- (.+)$/gm, '<li>$1</li>');
+            content = content.replace(/(<li>.*<\/li>)/s, '<ul>$1</ul>');
+            
+            // 处理数字列表
+            content = content.replace(/^\d+\. (.+)$/gm, '<li>$1</li>');
+            
+            // 处理粗体
+            content = content.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
+            
+            // 处理斜体
+            content = content.replace(/\*([^*]+)\*/g, '<em>$1</em>');
+            
+            return content;
         }
         
         function addStreamMessage(content, isUser, isComplete = false, isError = false) {
@@ -384,7 +485,7 @@
             if (!currentBotMessageDiv) {
                 currentBotMessageDiv = document.createElement('div');
                 currentBotMessageDiv.className = `message bot-message ${isError ? 'error-message' : ''}`;
-                currentBotMessageDiv.innerHTML = '<strong>KubeWizard:</strong> <span class="content"></span>';
+                currentBotMessageDiv.innerHTML = '<strong>KubeAgent:</strong> <span class="content"></span>';
                 chatContainer.appendChild(currentBotMessageDiv);
             }
             
@@ -439,7 +540,7 @@
                 return;
             }
             
-            addStreamMessage(message, true);
+            addMessage(message, true);
             userInput.value = '';
             showLoading(true);
             
@@ -458,24 +559,87 @@
                 
                 const reader = response.body.getReader();
                 const decoder = new TextDecoder();
+                let buffer = '';
                 
+                // 添加一个空的助手消息作为容器
+                const messageDiv = document.createElement('div');
+                messageDiv.className = 'message bot-message';
+                
+                const avatar = document.createElement('div');
+                avatar.className = 'message-avatar assistant-avatar';
+                avatar.textContent = 'AI';
+                
+                const messageContent = document.createElement('div');
+                messageContent.className = 'message-content';
+                
+                messageDiv.appendChild(avatar);
+                messageDiv.appendChild(messageContent);
+                chatContainer.appendChild(messageDiv);
+                
+                let fullResponse = '';
                 showLoading(false);
+                
+                let streamEnded = false;
                 
                 while (true) {
                     const { done, value } = await reader.read();
-                    if (done) break;
+                    if (done) {
+                        if (!streamEnded) {
+                            // 最终格式化完整响应
+                            messageContent.innerHTML = formatAIResponse(fullResponse);
+                            
+                            // 保存到当前会话
+                            if (!sessions[currentSessionId].messages) {
+                                sessions[currentSessionId].messages = [];
+                            }
+                            sessions[currentSessionId].messages.push({
+                                isUser: false,
+                                content: fullResponse
+                            });
+                            
+                            // 更新会话预览
+                            sessions[currentSessionId].preview = fullResponse.substring(0, 30) + '...';
+                            updateSessionsList();
+                        }
+                        break;
+                    }
                     
-                    const chunk = decoder.decode(value);
-                    const lines = chunk.split('\n');
+                    buffer += decoder.decode(value, { stream: true });
+                    const lines = buffer.split('\n');
+                    buffer = lines.pop(); // 保留不完整的行
                     
                     for (const line of lines) {
                         if (line.startsWith('data: ')) {
+                            const data = line.slice(6);
+                            if (data === '[DONE]') {
+                                if (!streamEnded) {
+                                    // 最终格式化完整响应
+                                    messageContent.innerHTML = formatAIResponse(fullResponse);
+                                    
+                                    // 保存到当前会话
+                                    if (!sessions[currentSessionId].messages) {
+                                        sessions[currentSessionId].messages = [];
+                                    }
+                                    sessions[currentSessionId].messages.push({
+                                        isUser: false,
+                                        content: fullResponse
+                                    });
+                                    
+                                    // 更新会话预览
+                                    sessions[currentSessionId].preview = fullResponse.substring(0, 30) + '...';
+                                    updateSessionsList();
+                                    streamEnded = true;
+                                }
+                                break;
+                            }
+                            
                             try {
-                                const data = JSON.parse(line.slice(6));
-                                addStreamMessage(data.content, false, data.done, data.error);
-                                
-                                if (data.done) {
-                                    break;
+                                const parsed = JSON.parse(data);
+                                if (parsed.content) {
+                                    fullResponse += parsed.content;
+                                    // 实时显示原始文本，避免频繁的HTML解析
+                                    messageContent.textContent = fullResponse;
+                                    chatContainer.scrollTop = chatContainer.scrollHeight;
                                 }
                             } catch (e) {
                                 console.error('Error parsing SSE data:', e);
@@ -486,14 +650,14 @@
                 
             } catch (error) {
                 console.error('Error in sendMessage:', error);
-                addStreamMessage(`网络错误: ${error.message}`, false, true, true);
+                addMessage(`网络错误: ${error.message}`, false);
                 updateStatus(false);
             } finally {
                 showLoading(false);
             }
         }
         
-        // Clear chat history
+        // Clear chat history for current session
         async function clearChatHistory() {
             if (!isConnected) return;
             
@@ -506,9 +670,17 @@
                 });
                 
                 if (response.ok) {
+                    // 清空当前会话的消息
+                    sessions[currentSessionId].messages = [];
+                    sessions[currentSessionId].preview = 'Kubernetes 助手对话...';
+                    
+                    // 清空聊天容器
                     chatContainer.innerHTML = '';
                     currentBotMessageDiv = null;
-                    addMessage('聊天历史已清除，您可以开始新的对话。', false);
+                    addMessage('当前会话历史已清除，您可以开始新的对话。', false);
+                    
+                    // 更新会话列表
+                    updateSessionsList();
                 } else {
                     addMessage('清除历史失败，请稍后重试。', false, true);
                 }
@@ -518,12 +690,121 @@
             }
         }
         
-        // Start new session (same as clear for now)
+        // Session management variables
+        let currentSessionId = 'current';
+        let sessionCounter = 1;
+        let sessions = {
+            'current': {
+                title: '当前会话',
+                messages: [],
+                preview: 'Kubernetes 助手对话...'
+            }
+        };
+        
+        // Start new session
         async function startNewSession() {
             if (!isConnected) return;
             
-            await clearChatHistory();
-            addMessage('已开始新会话，欢迎使用 KubeWizard！', false);
+            // 保存当前会话的消息
+            saveCurrentSession();
+            
+            // 创建新会话
+            sessionCounter++;
+            const newSessionId = `session_${sessionCounter}`;
+            const newSessionTitle = `会话 ${sessionCounter}`;
+            
+            sessions[newSessionId] = {
+                title: newSessionTitle,
+                messages: [],
+                preview: '新建会话'
+            };
+            
+            // 切换到新会话
+            switchToSession(newSessionId);
+            
+            // 更新会话列表UI
+            updateSessionsList();
+            
+            // 清空聊天容器并显示欢迎消息
+            chatContainer.innerHTML = '';
+            addMessage('新会话已开始！欢迎使用 KubeAgent！', false);
+        }
+        
+        function saveCurrentSession() {
+            const messages = [];
+            const messageElements = chatContainer.querySelectorAll('.message');
+            
+            messageElements.forEach(msg => {
+                const isUser = msg.classList.contains('user-message');
+                const content = msg.querySelector('.message-content')?.textContent || msg.textContent;
+                messages.push({
+                    isUser: isUser,
+                    content: content
+                });
+            });
+            
+            sessions[currentSessionId].messages = messages;
+            
+            // 更新预览文本
+            if (messages.length > 0) {
+                const lastMessage = messages[messages.length - 1];
+                sessions[currentSessionId].preview = lastMessage.content.substring(0, 30) + '...';
+            }
+        }
+        
+        function switchToSession(sessionId) {
+            // 保存当前会话
+            if (currentSessionId !== sessionId) {
+                saveCurrentSession();
+            }
+            
+            currentSessionId = sessionId;
+            
+            // 清空聊天容器
+            chatContainer.innerHTML = '';
+            
+            // 加载会话消息
+            const session = sessions[sessionId];
+            if (session && session.messages) {
+                session.messages.forEach(msg => {
+                    addMessage(msg.content, msg.isUser);
+                });
+            }
+            
+            // 更新活跃会话样式
+            updateActiveSession();
+        }
+        
+        function updateSessionsList() {
+            const sessionsList = document.getElementById('sessionsList');
+            sessionsList.innerHTML = '';
+            
+            Object.keys(sessions).reverse().forEach(sessionId => {
+                const session = sessions[sessionId];
+                const sessionItem = document.createElement('div');
+                sessionItem.className = `session-item ${sessionId === currentSessionId ? 'active' : ''}`;
+                sessionItem.setAttribute('data-session-id', sessionId);
+                sessionItem.innerHTML = `
+                    <div class="session-title">${session.title}</div>
+                    <div class="session-preview">${session.preview}</div>
+                `;
+                
+                sessionItem.addEventListener('click', () => {
+                    switchToSession(sessionId);
+                });
+                
+                sessionsList.appendChild(sessionItem);
+            });
+        }
+        
+        function updateActiveSession() {
+            const sessionItems = document.querySelectorAll('.session-item');
+            sessionItems.forEach(item => {
+                item.classList.remove('active');
+                if (item.getAttribute('data-session-id') === currentSessionId) {
+                    item.classList.add('active');
+                }
+            });
         }
         
         // Event listeners
@@ -542,14 +823,17 @@
         
         // Initialize application
         async function init() {
-            console.log('Initializing KubeWizard frontend...');
+            console.log('Initializing KubeAgent frontend...');
+            
+            // 初始化会话列表
+            updateSessionsList();
             
             // Check initial connection
             const connected = await checkConnection();
             
             if (connected) {
                 await loadChatHistory();
-                addMessage('欢迎使用 KubeWizard！我是您的 Kubernetes 智能助手。', false);
+                addMessage('欢迎使用 KubeAgent！我是您的 Kubernetes 智能助手。', false);
             } else {
                 addMessage('无法连接到后端服务，请检查服务器是否运行在 http://localhost:5000', false, true);
             }
@@ -576,7 +860,7 @@
                 const isUser = msg.classList.contains('user-message');
                 const content = msg.querySelector('.message-content')?.textContent || msg.textContent;
                 messages.push({
-                    type: isUser ? '用户' : 'KubeWizard',
+                    type: isUser ? '用户' : 'KubeAgent',
                     content: content
                 });
             });
@@ -590,7 +874,7 @@
             const url = URL.createObjectURL(blob);
             const a = document.createElement('a');
             a.href = url;
-            a.download = `kubewizard-chat-${new Date().toISOString().slice(0, 10)}.json`;
+            a.download = `kubeagent-chat-${new Date().toISOString().slice(0, 10)}.json`;
             document.body.appendChild(a);
             a.click();
             document.body.removeChild(a);

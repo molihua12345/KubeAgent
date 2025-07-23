@@ -6,3 +6,7 @@ __pycache__/
 .vscode/
 
 *.zip
+
+tmp/
+
+.vercel/

@@ -47,8 +47,9 @@ class ConsoleApp:
         self.web_port = web_port
         self.flask_app = None
         self.web_thread = None
-        self.chat_history = []
+        self.chat_history = []  # For web interface (deprecated, use agent memory instead)
         self.streaming_handler = None  # For streaming responses
+        self.agent = None  # Reference to the agent for memory access
 
         # Register default handlers
         self.register_default_handlers()
@@ -72,16 +73,8 @@ class ConsoleApp:
         def api_chat():
             data = request.get_json()
             message = data.get('message', '')
-            
-            # Add user message to history
-            self.chat_history.append({'content': message, 'is_user': True})
-            
             # Process the message using the default handler
             response = self.process_web_command(message)
-            
-            # Add bot response to history
-            self.chat_history.append({'content': response, 'is_user': False})
-            
             return jsonify({'response': response})
         
         @self.flask_app.route('/api/chat/stream', methods=['POST'])
@@ -90,10 +83,7 @@ class ConsoleApp:
             data = request.get_json()
             message = data.get('message', '')
             print(f"[DEBUG] Message: {message}")
-            
-            # Add user message to history
-            self.chat_history.append({'content': message, 'is_user': True})
-            print(f"[DEBUG] Added message to history, total messages: {len(self.chat_history)}")
+            print(f"[DEBUG] Processing message with streaming handler")
             
             def generate_response():
                 try:
@@ -102,21 +92,16 @@ class ConsoleApp:
                     if self.streaming_handler:
                         # Use the streaming handler if available
                         print(f"[DEBUG] Using streaming handler")
-                        full_response = ""
                         chunk_count = 0
                         for chunk in self.streaming_handler(None, message):
                             chunk_count += 1
-                            full_response += chunk
                             print(f"[DEBUG] Chunk {chunk_count}: {chunk[:50]}...")
-                            # Send each chunk as it comes
-                            yield f"data: {json.dumps({'content': full_response, 'done': False})}\n\n"
+                            # Send only the new chunk content, not accumulated
+                            yield f"data: {json.dumps({'content': chunk, 'done': False})}\n\n"
                             time.sleep(0.1)  # Small delay for better UX
                         
-                        # Send final message
-                        yield f"data: {json.dumps({'content': full_response, 'done': True})}\n\n"
-                        
-                        # Add bot response to history
-                        self.chat_history.append({'content': full_response, 'is_user': False})
+                        # Send final message to indicate completion
+                        yield f"data: {json.dumps({'content': '', 'done': True})}\n\n"
                     else:
                         # Fallback to original implementation
                         print(f"[DEBUG] Using fallback implementation")
@@ -136,15 +121,9 @@ class ConsoleApp:
                         
                         # Send final message
                         yield f"data: {json.dumps({'content': current_text.strip(), 'done': True})}\n\n"
-                        
-                        # Add bot response to history
-                        self.chat_history.append({'content': current_text.strip(), 'is_user': False})
-                     
                 except Exception as e:
                     error_msg = f"执行出错: {str(e)}"
                     yield f"data: {json.dumps({'content': error_msg, 'done': True, 'error': True})}\n\n"
-                    self.chat_history.append({'content': error_msg, 'is_user': False})
-            
             return Response(generate_response(), mimetype='text/event-stream', headers={
                 'Cache-Control': 'no-cache',
                 'Connection': 'keep-alive',
@@ -154,11 +133,19 @@ class ConsoleApp:
         
         @self.flask_app.route('/api/history', methods=['GET'])
         def api_history():
+            # Use agent memory if available, otherwise fallback to chat_history
+            if self.agent and hasattr(self.agent, 'get_conversation_history'):
+                history = self.agent.get_conversation_history()
+                return jsonify({'history': history})
             return jsonify({'history': self.chat_history})
         
         @self.flask_app.route('/api/clear', methods=['POST'])
         def api_clear():
-            self.chat_history.clear()
+            # Clear agent memory if available, otherwise clear chat_history
+            if self.agent and hasattr(self.agent, 'clear_conversation_history'):
+                self.agent.clear_conversation_history()
+            else:
+                self.chat_history.clear()
             return jsonify({'status': 'success'})
         
         @self.flask_app.route('/api/health', methods=['GET'])
@@ -344,6 +331,14 @@ class ConsoleApp:
         """
         console.print("Goodbye!", style="cyan bold")
         exit(0)
+
+    def set_agent(self, agent):
+        """
+        Set the agent reference for accessing conversation history.
+        
+        :param agent: The agent instance to reference.
+        """
+        self.agent = agent
 
     def unknown_command_handler(self, console: Console, args: Any):
         """

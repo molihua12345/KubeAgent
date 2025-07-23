@@ -1,6 +1,6 @@
-# Kubewizard
+# KubeAgent
 
-**Kubewizard** is An AI-Agent for automated Kubernetes troubleshooting, deployment, and management, based on LangChain and k8s related tools.
+**KubeAgent** is An AI-Agent for automated Kubernetes troubleshooting, deployment, and management, based on LangChain and k8s related tools.
 
 
 ## Features
@@ -14,49 +14,44 @@
 
 ## Usage
 
-KubeWizard 支持两种交互方式：命令行界面和Web界面。
+KubeAgent supports two interaction modes: command-line interface and web interface.
 
-### 环境配置
+### Environment Configuration
 
-添加环境变量到 `.env` 文件:
+Add environment variables to the `.env` file:
 ```sh
-# DeepSeek API Key (默认使用)
+# DeepSeek API Key (default)
 DEEPSEEK_API_KEY=your_deepseek_api_key
-# 或者使用 OpenAI API Key (可选)
+# Or use OpenAI API Key (optional)
 # OPENAI_API_KEY=your_openai_api_key
 KUBECONFIG=your_kubeconfig_path
 ```
 
-### 运行方式
+### Running Methods
 
-#### 1. 命令行界面 (默认)
+#### 1. Command Line Interface (Default)
 ```sh
 python main.py
-# 或者明确指定
+# Or explicitly specify
 python main.py --mode console
 ```
 
-#### 2. Web界面
+#### 2. Web Interface
 ```sh
 python main.py --mode web
-# 自定义端口
+# Custom port
 python main.py --mode web --port 8080
 ```
-然后在浏览器中访问 `http://localhost:5000` (或您指定的端口)
+Then access `http://localhost:5000` (or your specified port) in your browser
 
-#### 3. 同时启用两种界面
+#### 3. Enable Both Interfaces
 ```sh
 python main.py --mode both
 ```
 
-#### 4. 快速启动Web演示
+### Command Line Interface Commands
 ```sh
-python web_demo.py
-```
-
-### 命令行界面命令
-```sh
-kubewizard>: help
+kubeagent>: help
 Available commands:
   - clear  :  Clear the chat history.
   - history:  Display the chat history.
@@ -65,22 +60,22 @@ Available commands:
   - *      :  Ask me everything about your kubernetes cluster(why my nginx pod not ready)
 ```
 
-### Web界面特性
-- 🌐 现代化的Web聊天界面
-- 💬 实时对话交互
-- **流式输出**: AI回答会实时显示，包括思考过程和工具执行步骤
-- 📱 响应式设计，支持移动设备
-- 🔄 自动保存聊天历史
-- 🎨 美观的UI设计
-- 显示AI的完整推理过程（思考、工具调用、结果等）
+### Web Interface Features
+- 🌐 Modern web chat interface
+- 💬 Real-time conversation interaction
+- **Streaming Output**: AI responses are displayed in real-time, including thinking process and tool execution steps
+- 📱 Responsive design, supports mobile devices
+- 🔄 Automatic chat history saving
+- 🎨 Beautiful UI design
+- Display AI's complete reasoning process (thinking, tool calls, results, etc.)
 
 ## Installation
 
 1. Clone the repository:
 
    ```sh
-   git clone https://github.com/yourusername/kubewizard.git
-   cd kubewizard
+   git clone https://github.com/molihua12345/kubeagent.git
+   cd kubeagent
    ```
 
 2. Install the dependencies:
@@ -94,7 +89,7 @@ Available commands:
    cp .env.example .env
    ```
 
-   **注意**: 项目默认使用 DeepSeek API。如果你想使用 OpenAI API，可以在创建 KubeAgent 时传入自定义的 llm 参数。
+   **Note**: The project uses DeepSeek API by default. If you want to use OpenAI API, you can pass a custom llm parameter when creating KubeAgent.
 
 ## License
 

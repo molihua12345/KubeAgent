@@ -60,7 +60,7 @@ class KubeAgent:
     def invoke(self, input: str):
         return self.agent.invoke({
             "input": input,
-            "chat_history": self.get_chat_messages(),
+            "chat_history": self.memory.buffer,
         })
     
     def stream(self, input_data):
@@ -73,8 +73,25 @@ class KubeAgent:
             
         return self.agent.stream({
             "input": input_str,
-            "chat_history": self.get_chat_messages(),
+            "chat_history": self.memory.buffer,
         })
 
     def get_chat_messages(self):
         return self.memory.chat_memory.messages
+    
+    def get_conversation_history(self):
+        """Get conversation history in a format suitable for web interface"""
+        messages = []
+        for msg in self.memory.chat_memory.messages:
+            if hasattr(msg, 'content'):
+                # Determine if it's a user or AI message based on message type
+                is_user = msg.__class__.__name__ == 'HumanMessage'
+                messages.append({
+                    'content': msg.content,
+                    'is_user': is_user
+                })
+        return messages
+    
+    def clear_conversation_history(self):
+        """Clear the conversation history"""
+        self.memory.clear()

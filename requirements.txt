@@ -1,5 +1,5 @@
 beautifulsoup4==4.12.3
-duckduckgo_search==7.2.1
+requests==2.31.0
 html2text==2024.2.26
 langchain==0.3.14
 langchain_community==0.3.14

@@ -8,6 +8,7 @@ from langchain_core.language_models.chat_models import BaseChatModel
 
 from .prompt import REACT_PROMPT
 from tools import *
+from cth import CTHAgent
 
 class KubeAgent:
     """KubeAgent is an AI agent that helps users with Kubernetes issues.
@@ -19,11 +20,19 @@ class KubeAgent:
 
     name: str = "KubeAgent"
 
-    tools = [KubeTool(), KubeToolWithApprove(), human_console_input(), create_search_tool(), RequestsGet(allow_dangerous_requests=True)]
-
-    prompt = PromptTemplate.from_template(REACT_PROMPT, tools=tools)
-
     def __init__(self, llm: BaseChatModel= None, debug_level: Optional[int] = None):
+        # Initialize CTH agent
+        self.cth_agent = CTHAgent(llm)
+        
+        # Create tools including CTH tools
+        self.tools = [
+            KubeTool(), 
+            KubeToolWithApprove(), 
+            human_console_input(), 
+            create_search_tool(), 
+            RequestsGet(allow_dangerous_requests=True)
+        ] + create_cth_tools(self.cth_agent)
+        
         # 如果没有提供llm，则使用DeepSeek API
         if llm is None:
             llm = ChatOpenAI(
@@ -32,6 +41,10 @@ class KubeAgent:
                 base_url="https://api.deepseek.com",
                 api_key=os.getenv("DEEPSEEK_API_KEY"),
             )
+        
+        # Create prompt with tools
+        self.prompt = PromptTemplate.from_template(REACT_PROMPT, tools=self.tools)
+        
         self.memory = ConversationBufferMemory(memory_key="chat_history", output_key="output")
 
         agent = create_react_agent(llm, self.tools, self.prompt)

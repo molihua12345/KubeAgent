@@ -8,3 +8,9 @@ __pycache__/
 *.zip
 
 tmp/
+
+docs/
+
+examples/
+
+test_*.py

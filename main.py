@@ -125,6 +125,15 @@ def main():
     # Set streaming handler for web interface
     if args.mode in ['web', 'both']:
         app.streaming_handler = create_streaming_web_handler(kube_agent)
+    
+    # Initialize CTH API with the agent's CTH agent instance
+    try:
+        from api import init_cth_api
+        if hasattr(kube_agent, 'cth_agent'):
+            init_cth_api(kube_agent.cth_agent)
+            print("✅ CTH API initialized with KubeAgent's CTH instance")
+    except ImportError:
+        print("⚠️ CTH API not available")
 
     app.run(mode=args.mode)
 

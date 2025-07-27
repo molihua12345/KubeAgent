@@ -11,6 +11,14 @@ from flask import Flask, request, jsonify, render_template_string, Response, sen
 from flask_cors import CORS
 import time
 
+# Import CTH API
+try:
+    from api import cth_api, init_cth_api
+    CTH_AVAILABLE = True
+except ImportError:
+    CTH_AVAILABLE = False
+    print("Warning: CTH API not available. Install required dependencies.")
+
 # Define the type for command handlers
 CommandHandler = Callable[[Console, str], None]
 
@@ -61,7 +69,14 @@ class ConsoleApp:
         Initialize Flask application for web interface.
         """
         self.flask_app = Flask(__name__)
-        CORS(self.flask_app)       
+        CORS(self.flask_app)
+        
+        # Register CTH API blueprint if available
+        if CTH_AVAILABLE:
+            self.flask_app.register_blueprint(cth_api)
+            print("✅ CTH API endpoints registered at /api/cth/*")
+        else:
+            print("⚠️ CTH API not available")       
         
         @self.flask_app.route('/')
         def serve_frontend():

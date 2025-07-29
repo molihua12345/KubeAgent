@@ -14,3 +14,8 @@ docs/
 examples/
 
 test_*.py
+
+
+DATA_PROCESSING_README.md
+
+*.json

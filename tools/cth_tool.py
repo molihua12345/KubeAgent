@@ -64,6 +64,8 @@ class CTHBuildTool(BaseTool):
         "Build Causal-Temporal Hypergraph (CTH) from observability data. "
         "Input should be JSON string containing 'traces', 'metrics', and 'logs' arrays. "
         "This tool constructs the CTH graph that can be used for fault propagation analysis."
+        "the example param format of [observability_data] is as follows:"
+        """{"traces":[{"trace_id":"test-trace-001","spans":[{"service":"frontend","operation":"handle-request","start_time":"2024-01-15T10:00:00Z","end_time":"2024-01-15T10:00:02Z","status":"error","tags":{"pod":"frontend-pod-123","node":"worker-1"}}]}],"metrics":[{"entity":"frontend","metric_name":"response_time","value":2500,"timestamp":"2024-01-15T10:00:00Z","is_anomalous":"True","tags":{"pod":"frontend-pod-123"}}],"logs":[{"entity":"frontend","message":"Request failed: backend service timeout","level":"error","timestamp":"2024-01-15T10:00:02Z","tags":{"pod":"frontend-pod-123","trace_id":"test-trace-001"}}]}"""
     )
     args_schema: Type[BaseModel] = CTHBuildInput
     cth_agent: CTHAgent

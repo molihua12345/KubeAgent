@@ -13,6 +13,7 @@ from datetime import datetime
 
 from cth import CTHAgent, CTHBuilder, PropagationAnalyzer
 from .cth_manager import get_cth_manager
+from utils.data_processor import DataProcessor
 
 # Create Blueprint for CTH API
 cth_api = Blueprint('cth_api', __name__, url_prefix='/api/cth')
@@ -597,4 +598,210 @@ def clear_all_sessions():
         return jsonify({
             'success': False,
             'message': f'Failed to clear all sessions: {str(e)}'
+        }), 500
+
+
+@cth_api.route('/process', methods=['POST'])
+def process_raw_data():
+    """
+    Process raw JSON data and convert to CTH format.
+    
+    Expected JSON payload:
+    {
+        "session_id": "optional-session-id",
+        "data": [
+            {
+                "data_type": "trace|log|application",
+                "data": {...}
+            },
+            ...
+        ]
+    }
+    
+    Returns:
+    {
+        "success": true/false,
+        "message": "...",
+        "session_id": "...",
+        "cth_data": {
+            "traces": [...],
+            "metrics": [...],
+            "logs": [...]
+        },
+        "statistics": {...},
+        "errors": [...]
+    }
+    """
+    try:
+        # Validate request
+        if not request.is_json:
+            return jsonify({
+                'success': False,
+                'message': 'Request must be JSON',
+                'errors': ['Content-Type must be application/json']
+            }), 400
+        
+        request_data = request.get_json()
+        if not request_data:
+            return jsonify({
+                'success': False,
+                'message': 'Empty JSON payload',
+                'errors': ['Request body cannot be empty']
+            }), 400
+        
+        # Validate required fields
+        if 'data' not in request_data:
+            return jsonify({
+                'success': False,
+                'message': 'Missing required field: data',
+                'errors': ['Field "data" is required']
+            }), 400
+        
+        if not isinstance(request_data['data'], list):
+            return jsonify({
+                'success': False,
+                'message': 'Field "data" must be a list',
+                'errors': ['Field "data" must be an array of data items']
+            }), 400
+        
+        # Get session ID
+        session_id = get_session_id_from_request()
+        
+        # Process data using DataProcessor
+        processor = DataProcessor()
+        cth_data = processor.process_json_data(request_data['data'])
+        
+        # Generate statistics
+        statistics = {
+            'total_traces': len(cth_data.get('traces', [])),
+            'total_metrics': len(cth_data.get('metrics', [])),
+            'total_logs': len(cth_data.get('logs', [])),
+            'services_detected': len(processor.services),
+            'processing_timestamp': datetime.now().isoformat()
+        }
+        
+        return jsonify({
+            'success': True,
+            'message': 'Data processed successfully',
+            'session_id': session_id,
+            'cth_data': cth_data,
+            'statistics': statistics,
+            'errors': []
+        }), 200
+    
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'message': f'Internal server error: {str(e)}',
+            'session_id': get_session_id_from_request() if 'get_session_id_from_request' in locals() else 'unknown',
+            'cth_data': None,
+            'statistics': None,
+            'errors': [str(e), traceback.format_exc()]
+        }), 500
+
+
+@cth_api.route('/process-and-build', methods=['POST'])
+def process_and_build_cth():
+    """
+    Process raw JSON data and directly build CTH graph.
+    
+    Expected JSON payload:
+    {
+        "session_id": "optional-session-id",
+        "data": [
+            {
+                "data_type": "trace|log|application",
+                "data": {...}
+            },
+            ...
+        ]
+    }
+    
+    Returns:
+    {
+        "success": true/false,
+        "message": "...",
+        "session_id": "...",
+        "cth_graph": {...},
+        "cth_data": {...},
+        "statistics": {...},
+        "errors": [...]
+    }
+    """
+    try:
+        # Validate request
+        if not request.is_json:
+            return jsonify({
+                'success': False,
+                'message': 'Request must be JSON',
+                'errors': ['Content-Type must be application/json']
+            }), 400
+        
+        request_data = request.get_json()
+        if not request_data:
+            return jsonify({
+                'success': False,
+                'message': 'Empty JSON payload',
+                'errors': ['Request body cannot be empty']
+            }), 400
+        
+        # Validate required fields
+        if 'data' not in request_data:
+            return jsonify({
+                'success': False,
+                'message': 'Missing required field: data',
+                'errors': ['Field "data" is required']
+            }), 400
+        
+        # Get session ID and CTH agent
+        session_id = get_session_id_from_request()
+        cth_agent = cth_manager.get_agent(session_id)
+        
+        # Process data using DataProcessor
+        processor = DataProcessor()
+        cth_data = processor.process_json_data(request_data['data'])
+        
+        # Build CTH graph from processed data
+        build_result = cth_agent.build_cth_from_data(cth_data)
+        
+        # Generate statistics
+        statistics = {
+            'total_traces': len(cth_data.get('traces', [])),
+            'total_metrics': len(cth_data.get('metrics', [])),
+            'total_logs': len(cth_data.get('logs', [])),
+            'services_detected': len(processor.services),
+            'processing_timestamp': datetime.now().isoformat(),
+            'cth_build_success': build_result['success']
+        }
+        
+        if build_result['success']:
+            return jsonify({
+                'success': True,
+                'message': 'Data processed and CTH graph built successfully',
+                'session_id': session_id,
+                'cth_graph': build_result['cth_graph'],
+                'cth_data': cth_data,
+                'statistics': statistics,
+                'errors': []
+            }), 200
+        else:
+            return jsonify({
+                'success': False,
+                'message': 'Data processed but CTH graph build failed',
+                'session_id': session_id,
+                'cth_graph': None,
+                'cth_data': cth_data,
+                'statistics': statistics,
+                'errors': build_result['errors']
+            }), 400
+    
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'message': f'Internal server error: {str(e)}',
+            'session_id': get_session_id_from_request() if 'get_session_id_from_request' in locals() else 'unknown',
+            'cth_graph': None,
+            'cth_data': None,
+            'statistics': None,
+            'errors': [str(e), traceback.format_exc()]
         }), 500

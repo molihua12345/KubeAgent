@@ -48,8 +48,12 @@ class DataProcessor:
         if 'data' not in trace_data or 'spans' not in trace_data['data']:
             return
         
+        spans = trace_data['data']['spans']
+        if spans is None:
+            return
+        
         # 按服务分组spans，只保留最新的trace
-        for span in trace_data['data']['spans']:
+        for span in spans:
             service_name = self.extract_service_name(span.get('service', ''))
             trace_id = span.get('trace_id')
             timestamp = span.get('timestamp', 0)
@@ -87,7 +91,11 @@ class DataProcessor:
         if 'data' not in log_data or 'entries' not in log_data['data']:
             return
         
-        for entry in log_data['data']['entries']:
+        entries = log_data['data']['entries']
+        if entries is None:
+            return
+        
+        for entry in entries:
             service_name = self.extract_service_name(
                 entry.get('attributes', {}).get('service.name', '')
             )
@@ -121,6 +129,8 @@ class DataProcessor:
             return
         
         app_map = app_data['data']['app_map']
+        if app_map is None:
+            return
         application = app_map.get('application', {})
         
         service_name = self.extract_service_name(application.get('id', ''))
@@ -132,26 +142,28 @@ class DataProcessor:
         current_time_iso = current_time.isoformat() + 'Z'
         
         service_metrics = []
-        for indicator in application.get('indicators', []):
-            metric_name = indicator.get('message', '').lower().replace(' ', '_')
-            is_anomalous = indicator.get('status') in ['warning', 'critical', 'error']
-            
-            # 根据状态生成模拟的metric值
-            value = self._generate_metric_value(metric_name, indicator.get('status', 'ok'))
-            
-            metric = {
-                'entity': service_name,
-                'metric_name': metric_name,
-                'value': value,
-                'timestamp': current_time_iso,
-                'is_anomalous': is_anomalous,
-                'tags': {
-                    'namespace': application.get('labels', {}).get('ns', 'default'),
-                    'status': indicator.get('status', 'ok')
+        indicators = application.get('indicators', [])
+        if indicators is not None:
+            for indicator in indicators:
+                metric_name = indicator.get('message', '').lower().replace(' ', '_')
+                is_anomalous = indicator.get('status') in ['warning', 'critical', 'error']
+                
+                # 根据状态生成模拟的metric值
+                value = self._generate_metric_value(metric_name, indicator.get('status', 'ok'))
+                
+                metric = {
+                    'entity': service_name,
+                    'metric_name': metric_name,
+                    'value': value,
+                    'timestamp': current_time_iso,
+                    'is_anomalous': is_anomalous,
+                    'tags': {
+                        'namespace': application.get('labels', {}).get('ns', 'default'),
+                        'status': indicator.get('status', 'ok')
+                    }
                 }
-            }
-            
-            service_metrics.append(metric)
+                
+                service_metrics.append(metric)
         
         # 只保留每个服务最新的metrics
         if service_name not in self.service_metrics or current_timestamp > self.service_metrics[service_name]['latest_timestamp']:
@@ -161,9 +173,13 @@ class DataProcessor:
             }
         
         # 处理依赖关系，生成连接metrics
-        for instance in app_map.get('instances', []):
-            for dep in instance.get('dependencies', []):
-                dep_service = self.extract_service_name(dep.get('id', ''))
+        instances = app_map.get('instances', [])
+        if instances is not None:
+            for instance in instances:
+                dependencies = instance.get('dependencies', [])
+                if dependencies is not None:
+                    for dep in dependencies:
+                        dep_service = self.extract_service_name(dep.get('id', ''))
                 
                 # 从stats中提取数值
                 stats = dep.get('stats', [])
